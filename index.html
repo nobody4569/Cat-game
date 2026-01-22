@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>貓咪跳跳大冒險</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+            touch-action: manipulation; /* 防止雙擊縮放 */
+        }
+        #gameCanvas {
+            display: block;
+            background: linear-gradient(#87CEEB, #E0F6FF); /* 天藍色背景 */
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        #startMsg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 20px;
+            background: rgba(255,255,255,0.8);
+            padding: 20px;
+            border-radius: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">分數: 0</div>
+    <div id="startMsg">點擊螢幕或按空白鍵跳躍<br>躲避仙人掌！</div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('ui');
+        const startMsg = document.getElementById('startMsg');
+
+        // 遊戲設定
+        let canvasWidth, canvasHeight;
+        let gameActive = false;
+        let score = 0;
+        let gameSpeed = 5;
+
+        // 角色設定
+        const cat = {
+            x: 50,
+            y: 0,
+            width: 50,
+            height: 50,
+            velocityY: 0,
+            gravity: 0.8,
+            jumpStrength: -15,
+            grounded: false
+        };
+
+        // 障礙物
+        let obstacles = [];
+        let spawnTimer = 0;
+
+        // 初始化畫布大小
+        function resize() {
+            canvasWidth = window.innerWidth;
+            canvasHeight = window.innerHeight;
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+            cat.y = canvasHeight - 100; // 初始位置在底部
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        // 輸入控制
+        function jump() {
+            if (!gameActive) {
+                resetGame();
+                return;
+            }
+            if (cat.grounded) {
+                cat.velocityY = cat.jumpStrength;
+                cat.grounded = false;
+            }
+        }
+
+        window.addEventListener('keydown', (e) => { if (e.code === 'Space') jump(); });
+        window.addEventListener('touchstart', (e) => { 
+            e.preventDefault(); // 防止手機端默認行為
+            jump(); 
+        }, { passive: false });
+
+        function resetGame() {
+            score = 0;
+            gameSpeed = 5;
+            obstacles = [];
+            cat.y = canvasHeight - 100;
+            cat.velocityY = 0;
+            gameActive = true;
+            startMsg.style.display = 'none';
+            scoreElement.innerText = `分數: ${score}`;
+        }
+
+        function createObstacle() {
+            const size = 40 + Math.random() * 30;
+            obstacles.push({
+                x: canvasWidth,
+                y: canvasHeight - 50,
+                width: 30,
+                height: size,
+                color: '#2d5a27'
+            });
+        }
+
+        function update() {
+            if (!gameActive) return;
+
+            // 貓咪物理
+            cat.velocityY += cat.gravity;
+            cat.y += cat.velocityY;
+
+            // 落地檢測
+            if (cat.y > canvasHeight - 100) {
+                cat.y = canvasHeight - 100;
+                cat.velocityY = 0;
+                cat.grounded = true;
+            }
+
+            // 障礙物邏輯
+            spawnTimer++;
+            if (spawnTimer > Math.max(60, 120 - score)) { 
+                createObstacle();
+                spawnTimer = 0;
+            }
+
+            obstacles.forEach((obs, index) => {
+                obs.x -= gameSpeed;
+
+                // 碰撞檢測
+                if (
+                    cat.x < obs.x + obs.width &&
+                    cat.x + cat.width > obs.x &&
+                    cat.y < obs.y + obs.height &&
+                    cat.y + cat.height > obs.y
+                ) {
+                    gameOver();
+                }
+
+                // 移除出界障礙物並加分
+                if (obs.x + obs.width < 0) {
+                    obstacles.splice(index, 1);
+                    score++;
+                    scoreElement.innerText = `分數: ${score}`;
+                    if (score % 5 === 0) gameSpeed += 0.5; // 隨分數增加速度
+                }
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+            // 畫地板
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(0, canvasHeight - 50, canvasWidth, 50);
+
+            // 畫貓咪 (使用 Emoji)
+            ctx.font = '50px Arial';
+            ctx.fillText('🐱', cat.x, cat.y + 45);
+
+            // 畫障礙物
+            ctx.fillStyle = '#2d5a27';
+            obstacles.forEach(obs => {
+                ctx.fillText('🌵', obs.x, obs.y + 40);
+                // 如果想要矩形碰撞盒可視化，可以取消下面註釋
+                // ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+            });
+
+            requestAnimationFrame(() => {
+                update();
+                draw();
+            });
+        }
+
+        function gameOver() {
+            gameActive = false;
+            startMsg.innerHTML = `遊戲結束！<br>得分: ${score}<br>點擊螢幕重新開始`;
+            startMsg.style.display = 'block';
+        }
+
+        // 開始動畫循環
+        draw();
+    </script>
+</body>
+</html>
